@@ -1,0 +1,127 @@
+# Copyright (c) 2023, Bennett Samowich <bennett@foolean.org>
+# All rights reserved
+# SPDX short identifier: BSD-3-Clause
+---
+
+# We put the entire role in a block so we can create
+# a role specific tag, which saves the caller from
+# having to do so in their playbook.
+- name: Role foolean/ufw
+  block:
+
+    - name: CIS | Ensure ufw is installed
+      become: true
+      ansible.builtin.package:
+        name:
+          - 'ufw'
+          - 'python3-psutil'
+        state: present
+
+    - name: CIS | Ensure iptables-persistent and nftables are not installed
+      become: true
+      ansible.builtin.package:
+        name:
+          - 'iptables-persistent'
+          - 'nftables'
+        state: absent
+
+    - name: CIS | Ensure suspicious packets are logged
+      become: true
+      ansible.builtin.template:
+        src: 'etc/ufw/sysctl.conf.j2'
+        dest: '/etc/ufw/sysctl.conf'
+        owner: 'root'
+        group: 'root'
+        mode: '0644'
+
+    - name: CIS | Ensure ufw loopback trafic is configured
+      become: true
+      community.general.ufw:
+        rule: "{{ item.rule }}"
+        interface: "{{ item.interface }}"
+        direction: "{{ item.direction }}"
+        src: "{{ item.src }}"
+      with_items:
+        - {rule: deny, interface: null, direction: 'in', src: '::1'}
+        - {rule: deny, interface: null, direction: 'in', src: '127.0.0.8'}
+        - {rule: allow, interface: 'lo', direction: 'out', src: null}
+        - {rule: allow, interface: 'lo', direction: 'in', src: null}
+
+    # In order to pass CIS-CAT, we must have a rule for dhclient udp/68.
+    # Instead of blindly adding that rule we will check for the dhclient
+    # process and add/delete the rule as necessary
+
+    - name: Check for dhclient process
+      become: true
+      community.general.pids:
+        name: 'dhclient'
+      register: ufw_dhclient_pids
+
+    - name: Allow all access to udp port 68
+      become: true
+      community.general.ufw:
+        rule: allow
+        port: '68'
+        proto: 'udp'
+      when:
+        - "ufw_dhclient_pids.pids|length > 0"
+
+    - name: Delete rule for udp port 68
+      become: true
+      community.general.ufw:
+        rule: allow
+        port: '68'
+        proto: 'udp'
+        delete: true
+      when:
+        - "ufw_dhclient_pids.pids|length == 0"
+
+    - name: Allow outbound DNS
+      become: true
+      community.general.ufw:
+        rule: allow
+        direction: 'out'
+        port: '53'
+        proto: 'udp'
+
+    - name: Allow outbound HTTP
+      become: true
+      community.general.ufw:
+        rule: allow
+        direction: 'out'
+        port: '80,443'
+        proto: 'tcp'
+
+    - name: Allow all access to tcp port 22
+      become: true
+      community.general.ufw:
+        rule: allow
+        port: '22'
+        proto: 'tcp'
+        state: enabled
+
+    - name: CIS | Ensure ufw default deny firewall policy
+      become: true
+      community.general.ufw:
+        default: "{{ item.default }}"
+        direction: "{{ item.direction }}"
+      with_items:
+        - {default: 'deny', direction: 'routed'}
+        - {default: 'deny', direction: 'incoming'}
+        - {default: 'deny', direction: 'outgoing'}
+
+    - name: CIS | Ensure ufw service is enabled
+      become: true
+      ansible.builtin.service:
+        name: 'ufw'
+        masked: false
+        enabled: true
+        state: started
+
+  # This block is only applicable to RedHat based systems
+  when:
+    - ansible_os_family|lower == "debian"
+
+  # Tags to be applied to this role (block)
+  tags:
+    - 'role_foolean_ufw'
