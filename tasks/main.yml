@@ -43,7 +43,7 @@
         src: "{{ item.src }}"
       with_items:
         - {rule: deny, interface: null, direction: 'in', src: '::1'}
-        - {rule: deny, interface: null, direction: 'in', src: '127.0.0.8'}
+        - {rule: deny, interface: null, direction: 'in', src: '127.0.0.0/8'}
         - {rule: allow, interface: 'lo', direction: 'out', src: null}
         - {rule: allow, interface: 'lo', direction: 'in', src: null}
 
@@ -92,7 +92,15 @@
         port: '80,443'
         proto: 'tcp'
 
-    - name: Allow all access to tcp port 22
+    - name: Allow outbound SSH
+      become: true
+      community.general.ufw:
+        rule: allow
+        direction: 'out'
+        port: '22'
+        proto: 'tcp'
+
+    - name: Allow all inbound access to tcp port 22
       become: true
       community.general.ufw:
         rule: allow
