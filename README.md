@@ -31,6 +31,7 @@ Ansible role to manage ufw
 ## Supported Operating Systems
 
     * Debian (11)
+    * Raspbian (11)
 
 
 ## Compliance
