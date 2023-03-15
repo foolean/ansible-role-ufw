@@ -76,6 +76,15 @@
       when:
         - "ufw_dhclient_pids.pids|length == 0"
 
+    - name: Allow outbound NTP
+      become: true
+      community.general.ufw:
+        rule: allow
+        direction: 'out'
+        port: '123'
+        proto: 'udp'
+        log: true
+
     - name: Allow outbound DNS
       become: true
       community.general.ufw:
@@ -83,6 +92,7 @@
         direction: 'out'
         port: '53'
         proto: 'udp'
+        log: true
 
     - name: Allow outbound HTTP
       become: true
@@ -91,6 +101,7 @@
         direction: 'out'
         port: '80,443'
         proto: 'tcp'
+        log: true
 
     - name: Allow outbound SSH
       become: true
@@ -99,6 +110,7 @@
         direction: 'out'
         port: '22'
         proto: 'tcp'
+        log: true
 
     - name: Allow all inbound access to tcp port 22
       become: true
@@ -106,6 +118,7 @@
         rule: allow
         port: '22'
         proto: 'tcp'
+        log: true
         state: enabled
 
     - name: CIS | Ensure ufw default deny firewall policy
